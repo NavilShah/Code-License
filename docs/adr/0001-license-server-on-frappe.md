@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Proposed. This is Navil's stated preference (2026-10-19), pending his confirmation after review |
+| Status | **Superseded** by [ADR-0004](0004-license-server-on-django.md) on 2026-10-23. Navil chose a standalone Django application with no ERPNext integration. Kept for the record |
 | Date | 2026-10-19 |
 | Related | [Decision brief](../00-decision-brief.md), [Requirements](../01-requirements.md) |
 

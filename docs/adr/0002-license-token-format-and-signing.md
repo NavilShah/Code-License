@@ -2,13 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Status | Proposed. Confirm with the Phase 1 interop spike and the answer to N1 (oldest .NET Framework version) |
+| Status | Proposed. N1 answered on 2026-10-23: the oldest target is .NET Framework 4.7. Confirm with the interop spike (T1) |
 | Date | 2026-10-19 |
 | Related | [Requirements](../01-requirements.md) FR-SDK-1, NFR-2, NFR-8 |
 
 ## Context
 
-The Frappe app (Python) signs license tokens. They must verify **offline** in apps built on
+The license server (Python on Django; ADR-0004) signs license tokens. They must verify **offline** in apps built on
 .NET Framework, .NET Core and Python, and possibly Node later. The private key never leaves
 Navil's server.
 
@@ -22,8 +22,8 @@ Use a JWS in compact serialization (the JWT structure). The header carries `alg`
 ### Why ES256 rather than Ed25519
 
 ECDSA P-256 is built into .NET Core, Python's `cryptography` library and Node's `crypto`, and
-into .NET Framework. On .NET Framework, importing a key from parameters needs 4.7 or later;
-earlier versions need the Windows CNG key import. Confirm this in the spike.
+into .NET Framework. On .NET Framework, importing a key from parameters (`ECParameters`) needs
+4.7 or later, which matches the oldest target (N1). Confirm this in the spike (T1).
 
 Ed25519 is not built into .NET Framework and would need a third-party library.
 
@@ -67,7 +67,7 @@ vectors (NFR-8) cover this, and they are the first task of the Phase 1 spike.
 ### Key handling
 
 - There is one active signing key. Its private key is a PEM file outside the database and the
-  backups.
+  routine backups, with encrypted offline copies in two places (NFR-2).
 - SDK builds embed the current public key and the next one.
 - **Planned rotation:**
   1. Generate the new key.
@@ -77,6 +77,21 @@ vectors (NFR-8) cover this, and they are the first task of the Phase 1 spike.
   5. Retire the old key once every app has been updated.
 - **On compromise:** follow the same steps urgently. In addition, remove the old `kid` from the
   next SDK release, and reissue every license file in the field.
+
+### Implementation constraints
+
+- **.NET SDK:** no third-party packages (FR-SDK-6). Verify the compact JWS directly with
+  `System.Security.Cryptography.ECDsa`:
+  1. Split the token.
+  2. Decode the parts from base64url.
+  3. Check the header.
+  4. Verify the `r||s` signature over `header.payload` with SHA-256.
+
+  This is a small amount of code, and the test vectors cover it.
+- **Server:** sign with Python's `cryptography` library, then convert its DER signature to
+  `r||s` explicitly. Alternatively, use a JWS library that does the conversion.
+- **Test keys:** the test vectors use a separate key pair whose `kid` starts with `test-`.
+  Release builds must not embed it (NFR-2).
 
 ## Alternatives considered
 
